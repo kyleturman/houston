@@ -116,32 +116,6 @@ module Mcp
       end
 
       def load_oauth_credentials
-        # Try credentials file first
-        if (creds_file = config.dig('backend', 'credentialsFile'))
-          creds_path = Rails.root.join('mcp', creds_file)
-          if File.exist?(creds_path)
-            creds_data = JSON.parse(File.read(creds_path))
-            # Support Google's "installed" format or flat format
-            if creds_data['installed']
-              return {
-                client_id: creds_data['installed']['client_id'],
-                client_secret: creds_data['installed']['client_secret']
-              }
-            elsif creds_data['web']
-              return {
-                client_id: creds_data['web']['client_id'],
-                client_secret: creds_data['web']['client_secret']
-              }
-            else
-              return {
-                client_id: creds_data['client_id'],
-                client_secret: creds_data['client_secret']
-              }
-            end
-          end
-        end
-
-        # Fall back to env vars if specified
         if (env_vars = config.dig('backend', 'credentialsEnv'))
           return {
             client_id: ENV[env_vars[0]],

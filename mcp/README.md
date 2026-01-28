@@ -29,7 +29,6 @@ This directory contains configuration for MCP (Model Context Protocol) servers.
 | `servers.json` | Local server definitions |
 | `default_remote_servers.json` | Pre-configured remote servers shipped with the app |
 | `auth-providers/*.json` | OAuth/auth configurations for local servers |
-| `credentials/` | OAuth credential files like `google.json` (gitignored) |
 
 ## Credentials
 
@@ -282,7 +281,7 @@ See `plaid-server/` for a complete example.
 - Restart backend: `make restart`
 
 **OAuth failing?**
-- Verify credentials are set in root `.env` file (or `mcp/credentials/` for file-based creds)
+- Verify credentials are set in root `.env` file
 - Check redirect URI matches OAuth app config
 - Look at backend logs for token exchange errors
 

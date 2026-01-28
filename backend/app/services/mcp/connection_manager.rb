@@ -310,13 +310,6 @@ module Mcp
 
       auth_config = JSON.parse(File.read(auth_path)) rescue {}
 
-      # Check for credentials file first
-      if (creds_file = auth_config.dig('backend', 'credentialsFile'))
-        creds_path = File.join(mcp_dir, creds_file)
-        return File.exist?(creds_path)
-      end
-
-      # Fall back to env vars
       credentials = auth_config.dig('backend', 'credentialsEnv') || []
       return true if credentials.empty?
 

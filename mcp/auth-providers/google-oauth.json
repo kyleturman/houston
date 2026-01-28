@@ -48,9 +48,7 @@
         "grant_type": "refresh_token"
       }
     },
-    "credentialsEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
-    "credentialsFile": "credentials/google.json",
-    "credentialsFormat": "google"
+    "credentialsEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
   },
 
   "scopes": {
