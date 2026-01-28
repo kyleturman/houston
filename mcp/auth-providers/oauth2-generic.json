@@ -1,0 +1,53 @@
+{
+  "type": "oauth2",
+  "displayName": "OAuth 2.0 Authentication",
+  "description": "Authenticate using OAuth 2.0",
+
+  "backend": {
+    "authorizeEndpoint": {
+      "url": "{{authorize_url}}",
+      "params": {
+        "client_id": "{{client_id}}",
+        "redirect_uri": "{{redirect_uri}}",
+        "response_type": "code",
+        "scope": "{{scope}}",
+        "state": "{{state}}"
+      }
+    },
+    "tokenEndpoint": {
+      "url": "{{token_url}}",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "body": {
+        "client_id": "{{client_id}}",
+        "client_secret": "{{client_secret}}",
+        "code": "{{code}}",
+        "redirect_uri": "{{redirect_uri}}",
+        "grant_type": "authorization_code"
+      },
+      "response": {
+        "accessToken": "access_token",
+        "refreshToken": "refresh_token",
+        "expiresIn": "expires_in"
+      }
+    },
+    "credentialsEnv": [
+      "OAUTH_CLIENT_ID",
+      "OAUTH_CLIENT_SECRET"
+    ]
+  },
+
+  "runtime": {
+    "envMapping": {
+      "accessToken": "OAUTH_ACCESS_TOKEN",
+      "refreshToken": "OAUTH_REFRESH_TOKEN"
+    }
+  },
+
+  "ios": {
+    "handler": "oauth2",
+    "redirectUri": "heyhouston://oauth-callback"
+  }
+}

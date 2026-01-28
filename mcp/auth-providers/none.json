@@ -1,0 +1,5 @@
+{
+  "type": "none",
+  "displayName": "No Authentication",
+  "description": "This service does not require authentication"
+}

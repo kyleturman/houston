@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "notion": {
+      "enabled": true,
+      "name": "Notion",
+      "description": "Search, read, create, and update Notion pages and databases",
+      "url": "https://mcp.notion.com/mcp",
+      "auth_type": "oauth_consent"
+    }
+  }
+}

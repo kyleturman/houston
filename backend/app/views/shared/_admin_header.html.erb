@@ -1,0 +1,13 @@
+<div class="flex items-center justify-between pt-6 pb-12 px-8">
+  <div class="flex-1"></div>
+
+  <div class="flex-1 flex justify-center">
+    <h1 class="text-title-sm">Houston</h1>
+  </div>
+
+  <div class="flex-1 flex justify-end">
+    <% if defined?(current_user) && current_user && session[:admin_authenticated] %>
+      <%= link_to "Sign out", admin_signout_path, method: :delete, data: { turbo_method: :delete }, class: "text-body-sm text-muted", style: "text-decoration: none; transition: color 0.15s ease;" %>
+    <% end %>
+  </div>
+</div>

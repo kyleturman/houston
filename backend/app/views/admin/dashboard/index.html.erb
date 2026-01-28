@@ -1,0 +1,1107 @@
+<% content_for :head do %>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<% end %>
+
+<div class="container">
+  <!-- Main Grid: 3/4 Graphs + 1/4 Services -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+    <div class="lg:col-span-8">
+      <div class="card">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <h2 class="text-title-sm"><%= ENV['SERVER_DISPLAY_NAME'].presence || 'Your server' %></h2>
+          <div class="flex items-center gap-3">
+            <!-- Week navigation -->
+            <div class="flex gap-2">
+              <button id="prevWeek" class="btn-icon">
+                <svg style="transform: rotate(180deg);" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M15.374 9.66797L15.6865 10.0205L11.3535 14.3535L10.6465 13.6465L13.793 10.5H4V9.5H13.8867L10.626 5.83203L11.374 5.16797L15.374 9.66797Z"/></svg>
+              </button>
+              <button id="nextWeek" class="btn-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M15.374 9.66797L15.6865 10.0205L11.3535 14.3535L10.6465 13.6465L13.793 10.5H4V9.5H13.8867L10.626 5.83203L11.374 5.16797L15.374 9.66797Z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div style="height: 240px;">
+          <canvas id="activityChart"></canvas>
+        </div>
+
+        <!-- Cost Statistics -->
+        <div class="grid grid-cols-3 gap-4 mt-6">
+          <div>
+            <div class="text-title-sm text-accent">$<%= sprintf("%.2f", @stats[:llm_costs][:lifetime]) %></div>
+            <div class="text-body-sm text-muted mt-1">Lifetime cost</div>
+          </div>
+          <div>
+            <div class="text-title-sm text-accent">$<%= sprintf("%.2f", @stats[:llm_costs][:current_month]) %></div>
+            <div class="text-body-sm text-muted mt-1"><%= Date.today.strftime("%B") %> cost so far</div>
+          </div>
+          <div>
+            <div class="text-title-sm text-accent">$<%= @stats[:llm_costs][:predicted_monthly].ceil %>~</div>
+            <div class="text-body-sm text-muted mt-1">Monthly avg cost</div>
+          </div>
+        </div>
+        <div class="text-body-xs text-muted mt-4 opacity-50">All costs estimated, not guaranteed to be exact</div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-4">
+      <div class="min-h-full flex flex-col gap-5">
+        <!-- Backend Service -->
+        <div class="border-subtle border rounded-xl p-3">
+          <div class="flex items-center gap-1 mb-2">
+            <span class="status-dot status-healthy"></span>
+            <span class="text-body font-medium">Backend</span>
+          </div>
+          <p class="text-body-sm text-muted">
+            Rails <%= Rails.version %>
+            <br><%= @stats[:system][:backend][:memory_mb] %> MB active memory
+            <br><%= @stats[:system][:backend][:uptime] %> uptime
+            <br><%= @stats[:system][:backend][:threads] %> threads
+            <% if @stats[:system][:backend][:debug_ps_line] %>
+              <br><br><strong>DEBUG:</strong>
+              <br>PS line: "<%= @stats[:system][:backend][:debug_ps_line] %>"
+              <br>Parsed memory: <%= @stats[:system][:backend][:debug_memory_mb] %> MB
+            <% end %>
+          </p>
+        </div>
+
+        <!-- Database Service -->
+        <div class="border-subtle border rounded-xl p-3">
+          <div class="flex items-center gap-1 mb-2">
+            <span class="status-dot <%= @stats[:system][:postgres] ? 'status-healthy' : 'status-unhealthy' %>"></span>
+            <span class="text-body font-medium">Database</span>
+          </div>
+          <p class="text-body-sm text-muted">
+            <%= @stats[:database][:users] %> users, <%= @stats[:database][:goals] %> goals
+            <br><%= @stats[:database][:notes] %> notes, <%= number_with_delimiter(@stats[:database][:thread_messages]) %> messages
+            <br>Size: <%= @stats[:database][:size] %>
+            <br>Connections: <%= @stats[:database][:connections][:active] %>/<%= @stats[:database][:connections][:pool_size] %> active
+          </p>
+        </div>
+
+        <!-- Background Jobs (Sidekiq + Redis) -->
+        <div class="border-subtle border rounded-xl p-3 flex-1">
+          <div class="flex items-center gap-1 mb-2">
+            <span class="status-dot <%= @stats[:system][:sidekiq] && @stats[:system][:redis] ? 'status-healthy' : 'status-unhealthy' %>"></span>
+            <span class="text-body font-medium">Background Jobs</span>
+          </div>
+          <p class="text-body-sm text-muted">
+            <%= number_with_delimiter(@stats[:sidekiq][:processed]) %> processed
+            <% if @stats[:sidekiq][:failed] > 0 %>
+              <br><span><%= number_with_delimiter(@stats[:sidekiq][:failed]) %> failed</span>
+            <% end %>
+            <% if @stats[:sidekiq][:enqueued] > 0 %>
+              <br><%= @stats[:sidekiq][:enqueued] %> enqueued
+            <% end %>
+            <% if @stats[:sidekiq][:scheduled_size] > 0 %>
+              <br><%= @stats[:sidekiq][:scheduled_size] %> scheduled
+            <% end %>
+            <% if @stats[:sidekiq][:retry_size] > 0 %>
+              <br><%= @stats[:sidekiq][:retry_size] %> retrying
+            <% end %>
+            <br><%= @stats[:sidekiq][:success_percentage] %>% success rate
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Section -->
+  <div class="mb-8">
+    <h2 class="text-title-sm mb-4">Users</h2>
+
+    <!-- Invite User -->
+    <div class="card mb-4">
+      <form id="inviteUserForm" class="flex mt-1 mb-2">
+        <input
+          type="email"
+          id="inviteEmail"
+          placeholder="user@example.com"
+          class="input-field flex-1 !rounded-r-none"
+          required
+        >
+        <button type="submit" id="inviteButton" disabled class="btn-primary !rounded-l-none">
+          <%= @stats[:email_enabled] ? 'Invite to Server' : 'Add User' %>
+        </button>
+      </form>
+      <% unless @stats[:email_enabled] %>
+        <p class="text-body-sm text-muted mt-2">Email is not configured. Users will need an invite token to sign in.</p>
+      <% end %>
+
+      <div class="flex flex-col gap-3">
+        <% @stats[:users][:users].each_with_index do |user, index| %>
+          <div class="py-5" style="border-bottom: 1px solid var(--color-border-subtle);">
+            <!-- Main row -->
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <div class="text-body font-medium"><%= user[:email] %></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <% if @stats[:email_enabled] %>
+                  <button
+                    onclick="sendSignInLink('<%= user[:id] %>')"
+                    class="btn-secondary text-body-sm"
+                  >
+                    Send Sign-in Link
+                  </button>
+                <% end %>
+                <button
+                  onclick="openInviteTokenModal('<%= user[:id] %>', '<%= user[:email] %>')"
+                  class="btn-secondary text-body-sm"
+                >
+                  Invite Token
+                </button>
+                <button
+                  onclick="deactivateUser('<%= user[:id] %>')"
+                  class="btn-icon text-error hover:bg-error/10"
+                  title="Deactivate user"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Info row -->
+            <div class="flex items-center gap-2 text-body-sm text-muted">
+              <span>Joined <%= time_ago_in_words(user[:created_at]) %> ago</span>
+              <span>·</span>
+              <span>
+                $<%= sprintf("%.2f", user[:total_cost]) %> in LLM costs
+              </span>
+              <% if user[:devices].any? %>
+                <span>·</span>
+                <button
+                  class="text-accent hover:underline flex items-center gap-1"
+                  onclick="toggleDevices('<%= user[:id] %>')"
+                >
+                  <span><%= user[:devices].count %> session<%= user[:devices].count == 1 ? '' : 's' %></span>
+                  <svg
+                    id="caret-<%= user[:id] %>"
+                    class="w-4 h-4"
+                    style="transition: transform 0.3s ease-out;"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+              <% else %>
+                <span>·</span>
+                <span>No devices</span>
+              <% end %>
+            </div>
+
+            <!-- Devices accordion -->
+            <% if user[:devices].any? || user[:invite_tokens].any? %>
+              <div
+                id="devices-<%= user[:id] %>"
+                class="devices-accordion"
+                style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;"
+              >
+                <div class="mt-4 flex gap-3 overflow-x-auto pb-2">
+                  <% user[:devices].each do |device| %>
+                    <div class="border-subtle border rounded-lg p-3 min-w-[200px] flex-shrink-0">
+                      <div class="flex items-start justify-between mb-2">
+                        <div class="flex-1">
+                          <p class="text-body font-medium"><%= device[:name] %></p>
+                          <p class="text-body-sm text-muted">
+                            <%= device[:platform] %>
+                          </p>
+                        </div>
+                        <button
+                          onclick="revokeDevice('<%= device[:id] %>')"
+                          class="text-error hover:opacity-80 ml-2"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p class="text-body-sm text-muted">
+                        <%= device[:last_used_at] ? "Used #{time_ago_in_words(device[:last_used_at])} ago" : "Never used" %>
+                      </p>
+                    </div>
+                  <% end %>
+                  <% user[:invite_tokens].select { |t| t[:status] == 'active' || t[:status] == 'used' }.each do |token| %>
+                    <div class="border-subtle border rounded-lg p-3 min-w-[200px] flex-shrink-0" style="<%= token[:status] == 'active' ? 'border-color: var(--color-success); background-color: var(--color-success-muted);' : '' %>">
+                      <div class="flex items-start justify-between mb-2">
+                        <div class="flex-1">
+                          <p class="text-body font-medium">Invite Token</p>
+                          <p class="text-body-sm text-muted">
+                            <span class="<%= token[:status] == 'active' ? 'text-success' : '' %>"><%= token[:status].capitalize %></span>
+                          </p>
+                        </div>
+                        <button
+                          onclick="revokeInviteToken('<%= token[:id] %>')"
+                          class="text-error hover:opacity-80 ml-2"
+                          title="Revoke token"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p class="text-body-sm text-muted">
+                        <% if token[:expires_at] %>
+                          Expires <%= time_ago_in_words(token[:expires_at]) %>
+                        <% else %>
+                          Never expires
+                        <% end %>
+                        <% if token[:first_used_at] %>
+                          <br>Used <%= time_ago_in_words(token[:first_used_at]) %> ago
+                        <% end %>
+                      </p>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Deactivated Users -->
+      <% if @stats[:users][:deactivated_users].any? %>
+        <div class="mt-6">
+          <button
+            class="flex items-center gap-2 text-body-sm text-muted hover:text-primary transition-colors w-full"
+            onclick="toggleDeactivatedUsers()"
+          >
+            <svg
+              id="deactivated-caret"
+              class="w-4 h-4"
+              style="transition: transform 0.3s ease-out;"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+            <span>Deactivated users (<%= @stats[:users][:deactivated_users].count %>)</span>
+          </button>
+
+          <div
+            id="deactivated-users"
+            style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;"
+          >
+            <div class="flex flex-col gap-3 mt-3">
+              <% @stats[:users][:deactivated_users].each do |user| %>
+                <div class="border-subtle border rounded-xl p-4 hover:bg-tertiary transition-colors opacity-60">
+                  <!-- Main row -->
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="text-body font-medium"><%= user[:email] %></div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        onclick="reactivateUser('<%= user[:id] %>')"
+                        class="btn-primary text-body-sm"
+                      >
+                        Re-activate User
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Info row -->
+                  <div class="flex items-center gap-2 text-body-sm text-muted">
+                    <span>Joined <%= time_ago_in_words(user[:created_at]) %> ago</span>
+                    <span>·</span>
+                    <span class="<%= user[:total_cost] > 0 ? 'text-accent' : '' %>">
+                      $<%= sprintf("%.4f", user[:total_cost]) %>
+                    </span>
+                    <span>·</span>
+                    <span>Deactivated</span>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- LLMs Section -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-title-sm">LLMs</h2>
+      <a href="#" class="text-body-sm text-accent hover:underline">Edit</a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Selected Providers (Agents/Tasks/Summaries) -->
+      <div class="card">
+        <h3 class="text-body font-semibold mb-4">Active Configuration</h3>
+        <div class="flex flex-col gap-3">
+          <% @stats[:llm_health][:configuration].each do |use_case, config| %>
+            <div class="border-subtle border rounded-lg p-3">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="status-dot <%= config.healthy? ? 'status-healthy' : 'status-unhealthy' %>"></span>
+                <span class="text-body font-medium capitalize"><%= use_case %></span>
+              </div>
+              <p class="text-body-sm text-muted">
+                <%= config.details[:provider] %>: <%= config.details[:model] %>
+              </p>
+              <p class="text-body-sm <%= config.healthy? ? 'text-success' : 'text-error' %> mt-1">
+                <%= config.details[:api_key_status] %>
+              </p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Enabled Providers -->
+      <div class="card">
+        <h3 class="text-body font-semibold mb-4">Enabled Providers</h3>
+        <div class="flex flex-col gap-3">
+          <% @stats[:llm_health][:providers].each do |provider, info| %>
+            <div class="border-subtle border rounded-lg p-3"
+                 style="<%= info[:configured] ? 'background-color: var(--color-success-muted); border-color: var(--color-success);' : '' %>">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-body font-medium capitalize"><%= provider %></span>
+                <% if info[:in_use] %>
+                  <span class="text-body-sm bg-success text-bg-primary px-2 py-1 rounded">In Use</span>
+                <% end %>
+              </div>
+              <p class="text-body-sm <%= info[:configured] ? 'text-success' : 'text-muted' %>">
+                <%= info[:api_key_message] %>
+              </p>
+              <% if info[:used_in].any? %>
+                <p class="text-body-sm text-muted mt-2">
+                  Used for: <%= info[:used_in].join(', ') %>
+                </p>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MCP Servers Section -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-title-sm">MCP Servers</h2>
+      <span class="text-body-sm text-muted">
+        <%= @stats[:mcp_servers][:configured_count] %> configured,
+        <%= @stats[:mcp_servers][:unconfigured_count] %> need setup,
+        <%= @stats[:mcp_servers][:remote_count] %> remote
+      </span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Local MCP Servers (2/3 width) -->
+      <div class="card lg:col-span-2">
+        <h3 class="text-body font-semibold mb-4">Local Servers</h3>
+
+        <!-- Configured servers in 2-column grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <% local_configured = @stats[:mcp_servers][:local_configured] || [] %>
+          <% if local_configured.any? %>
+            <% local_configured.each do |server| %>
+              <div class="border-subtle border rounded-lg p-3"
+                   style="<%= server[:healthy] ? 'background-color: var(--color-success-muted); border-color: var(--color-success);' : '' %>">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="status-dot <%= server[:healthy] ? 'status-healthy' : 'status-unhealthy' %>"></span>
+                  <span class="text-body font-medium"><%= server[:name] %></span>
+                </div>
+                <p class="text-body-sm text-muted">
+                  <%= server[:tools_count] %> tools, <%= server[:connection_count] %> connections
+                </p>
+              </div>
+            <% end %>
+          <% else %>
+            <p class="text-body-sm text-muted col-span-2">No local servers running</p>
+          <% end %>
+        </div>
+
+        <!-- Available with setup section -->
+        <% local_unconfigured = @stats[:mcp_servers][:local_unconfigured] || [] %>
+        <% if local_unconfigured.any? %>
+          <div class="mt-6 pt-6" style="border-top: 1px solid var(--color-border-subtle);">
+            <h4 class="text-body-sm font-medium text-muted mb-3">Available with setup</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <% local_unconfigured.each do |server| %>
+                <div class="border-subtle border rounded-lg p-3 opacity-70">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="status-dot status-disconnected"></span>
+                    <span class="text-body font-medium"><%= server[:name] %></span>
+                    <% if server[:tools_count] > 0 %>
+                      <span class="text-body-xs text-muted">(<%= server[:tools_count] %> tools)</span>
+                    <% end %>
+                    <% if server[:auth_type] == 'oauth2' %>
+                      <span class="text-body-xs px-2 py-0.5 rounded" style="background-color: var(--color-info-muted); color: var(--color-info);">OAuth</span>
+                    <% elsif server[:auth_type] == 'api_key' %>
+                      <span class="text-body-xs px-2 py-0.5 rounded" style="background-color: var(--color-success-muted); color: var(--color-success);">API Key</span>
+                    <% elsif server[:auth_type] == 'plaid_link' %>
+                      <span class="text-body-xs px-2 py-0.5 rounded" style="background-color: var(--color-accent-muted); color: var(--color-accent);">Plaid</span>
+                    <% end %>
+                  </div>
+                  <% if server[:description] %>
+                    <p class="text-body-sm text-muted mb-2">
+                      <%= server[:description] %>
+                    </p>
+                  <% end %>
+                  <% if server[:missing_credentials].any? %>
+                    <p class="text-body-sm mb-2" style="color: var(--color-warning);">
+                      Missing: <%= server[:missing_credentials].join(', ') %>
+                    </p>
+                  <% end %>
+                  <% if server[:auth_type] == 'oauth2' %>
+                    <div class="mt-2 pt-2" style="border-top: 1px dashed var(--color-border-subtle);">
+                      <button
+                        class="flex items-center gap-1 text-body-xs text-muted hover:text-primary transition-colors"
+                        onclick="toggleOAuthInstructions('<%= server[:internal_name] %>')"
+                      >
+                        <svg
+                          id="oauth-caret-<%= server[:internal_name] %>"
+                          class="w-3 h-3"
+                          style="transition: transform 0.2s ease-out;"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span>Instructions</span>
+                      </button>
+                      <div
+                        id="oauth-instructions-<%= server[:internal_name] %>"
+                        style="max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out;"
+                      >
+                        <div class="text-body-xs text-muted mt-2">
+                          <p class="mb-1">Redirect URI:</p>
+                          <code class="text-accent" style="font-size: 10px; word-break: break-all;"><%= server[:oauth_redirect_uri] %></code>
+                          <% if server[:oauth_scopes].present? %>
+                            <p class="mt-2 mb-1">Scopes:</p>
+                            <code style="font-size: 10px; word-break: break-all;"><%= server[:oauth_scopes] %></code>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Remote MCP Servers (1/3 width) -->
+      <div class="card">
+        <h3 class="text-body font-semibold mb-4">Remote Servers</h3>
+        <div class="flex flex-col gap-3">
+          <% remote_servers = @stats[:mcp_servers][:remote_servers] || [] %>
+          <% if remote_servers.any? %>
+            <% remote_servers.each do |server| %>
+              <div class="border-subtle border rounded-lg p-3">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="status-dot status-healthy"></span>
+                  <span class="text-body font-medium"><%= server[:name] %></span>
+                </div>
+                <% if server[:description] %>
+                  <p class="text-body-sm text-muted">
+                    <%= server[:description] %>
+                  </p>
+                <% end %>
+                <p class="text-body-sm text-muted">
+                  <%= server[:connection_count] %> user connections
+                </p>
+              </div>
+            <% end %>
+          <% else %>
+            <p class="text-body-sm text-muted">No remote servers configured</p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js Configuration -->
+<script>
+  const emailEnabled = <%= @stats[:email_enabled].to_json %>;
+  let weekOffset = 0;
+  let chartInstance = null;
+  let currentWeekData = {};
+
+  // Data from backend (last 30 days) - array of [date, cost] pairs
+  const dailyCostsArray = <%= @stats[:llm_costs][:daily_costs].to_json.html_safe %>;
+
+  // Convert to object for easier lookup
+  const allCostData = {};
+  dailyCostsArray.forEach(([date, cost]) => {
+    allCostData[date] = cost;
+  });
+
+  // Generate call count data from costs (rough estimate: $0.01 per call average)
+  const allCallsData = {};
+  Object.keys(allCostData).forEach(date => {
+    allCallsData[date] = Math.round((allCostData[date] || 0) / 0.01);
+  });
+
+  function getWeekData(offset) {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - (offset * 7));
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
+
+    const weekData = {};
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      weekData[dateStr] = allCallsData[dateStr] || 0;
+    }
+
+    return weekData;
+  }
+
+  function updateChart() {
+    // Verify Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+      console.error('Chart.js is not loaded!');
+      return;
+    }
+
+    // Verify canvas exists
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) {
+      console.error('Canvas element not found!');
+      return;
+    }
+
+    currentWeekData = getWeekData(weekOffset);
+    const labels = Object.keys(currentWeekData).map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    const values = Object.values(currentWeekData);
+
+    if (chartInstance) {
+      chartInstance.data.labels = labels;
+      chartInstance.data.datasets[0].data = values;
+      chartInstance.update();
+    } else {
+      const ctx = canvas.getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'API Calls',
+            data: values,
+            borderColor: '#6B90FF',
+            backgroundColor: 'rgba(107, 144, 255, 0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  return context[0].label;
+                },
+                label: function(context) {
+                  const dateStr = Object.keys(currentWeekData)[context.dataIndex];
+                  const calls = context.parsed.y;
+                  const cost = Number(allCostData[dateStr]) || 0;
+                  return [
+                    `${calls.toLocaleString()} API calls`,
+                    `$${cost.toFixed(2)} cost`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              display: false,
+              grid: {
+                display: false
+              }
+            },
+            x: {
+              ticks: {
+                color: '#a3a3a3'
+              },
+              grid: {
+                color: '#262626'
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // Week navigation
+  document.getElementById('prevWeek').addEventListener('click', () => {
+    weekOffset++;
+    updateChart();
+  });
+
+  document.getElementById('nextWeek').addEventListener('click', () => {
+    if (weekOffset > 0) {
+      weekOffset--;
+      updateChart();
+    }
+  });
+
+  // Initialize chart when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateChart);
+  } else {
+    updateChart();
+  }
+
+  // Enable/disable invite button based on email input
+  const inviteEmailInput = document.getElementById('inviteEmail');
+  const inviteButton = document.getElementById('inviteButton');
+
+  inviteEmailInput.addEventListener('input', () => {
+    inviteButton.disabled = !inviteEmailInput.value.trim();
+  });
+
+  // Invite user form
+  document.getElementById('inviteUserForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('inviteEmail').value;
+
+    if (emailEnabled) {
+      // Email enabled: create user and send magic link
+      try {
+        const response = await fetch('/admin/create_user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ email })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert(result.message);
+          document.getElementById('inviteEmail').value = '';
+          window.location.reload();
+        } else {
+          alert('Error: ' + result.message);
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    } else {
+      // Email not enabled: create user and show invite token modal
+      try {
+        const response = await fetch('/admin/create_user_with_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ email })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          document.getElementById('inviteEmail').value = '';
+          // Show the token and invite link in the modal
+          document.getElementById('inviteTokenModalTitle').textContent = `Invite Token for ${email}`;
+          document.getElementById('inviteTokenForm').classList.add('hidden');
+          document.getElementById('inviteTokenResult').classList.remove('hidden');
+          document.getElementById('generatedInviteLink').textContent = result.invite_link;
+          document.getElementById('generatedToken').textContent = result.token;
+          document.getElementById('tokenExpiryInfo').textContent = result.expires_at
+            ? `Expires: ${new Date(result.expires_at).toLocaleDateString()}`
+            : 'Never expires';
+          document.getElementById('inviteTokenModal').classList.remove('hidden');
+        } else {
+          alert('Error: ' + result.message);
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+  });
+
+  // Send sign-in link
+  async function sendSignInLink(userId) {
+    try {
+      const response = await fetch('/admin/send_link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      const result = await response.json();
+      alert(result.message);
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Toggle devices accordion
+  function toggleDevices(userId) {
+    const devicesEl = document.getElementById('devices-' + userId);
+    const caretEl = document.getElementById('caret-' + userId);
+
+    if (devicesEl.style.maxHeight && devicesEl.style.maxHeight !== '0px') {
+      // Close accordion
+      devicesEl.style.maxHeight = '0px';
+      caretEl.style.transform = 'rotate(0deg)';
+    } else {
+      // Open accordion - set to scrollHeight for smooth animation
+      devicesEl.style.maxHeight = devicesEl.scrollHeight + 'px';
+      caretEl.style.transform = 'rotate(180deg)';
+    }
+  }
+
+  // Deactivate user
+  async function deactivateUser(userId) {
+    if (!confirm('Are you sure you want to deactivate this user? They will be logged out of all devices.')) return;
+
+    try {
+      const response = await fetch('/admin/deactivate_user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        window.location.reload();
+      } else {
+        alert('Error: ' + (result.message || 'Unknown error occurred'));
+      }
+    } catch (error) {
+      console.error('Deactivate user error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Reactivate user
+  async function reactivateUser(userId) {
+    if (!confirm('Are you sure you want to reactivate this user?')) return;
+
+    try {
+      const response = await fetch('/admin/reactivate_user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        window.location.reload();
+      } else {
+        alert('Error: ' + (result.message || 'Unknown error occurred'));
+      }
+    } catch (error) {
+      console.error('Reactivate user error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Toggle deactivated users accordion
+  function toggleDeactivatedUsers() {
+    const deactivatedEl = document.getElementById('deactivated-users');
+    const caretEl = document.getElementById('deactivated-caret');
+
+    if (deactivatedEl.style.maxHeight && deactivatedEl.style.maxHeight !== '0px') {
+      // Close accordion
+      deactivatedEl.style.maxHeight = '0px';
+      caretEl.style.transform = 'rotate(0deg)';
+    } else {
+      // Open accordion - set to scrollHeight for smooth animation
+      deactivatedEl.style.maxHeight = deactivatedEl.scrollHeight + 'px';
+      caretEl.style.transform = 'rotate(180deg)';
+    }
+  }
+
+  // Toggle OAuth instructions accordion
+  function toggleOAuthInstructions(serverName) {
+    const instructionsEl = document.getElementById('oauth-instructions-' + serverName);
+    const caretEl = document.getElementById('oauth-caret-' + serverName);
+
+    if (instructionsEl.style.maxHeight && instructionsEl.style.maxHeight !== '0px') {
+      // Close accordion
+      instructionsEl.style.maxHeight = '0px';
+      caretEl.style.transform = 'rotate(0deg)';
+    } else {
+      // Open accordion
+      instructionsEl.style.maxHeight = instructionsEl.scrollHeight + 'px';
+      caretEl.style.transform = 'rotate(90deg)';
+    }
+  }
+
+  // Revoke device
+  async function revokeDevice(deviceId) {
+    if (!confirm('Are you sure you want to revoke this device?')) return;
+
+    try {
+      const response = await fetch('/admin/revoke_device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ device_id: deviceId })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        window.location.reload();
+      } else {
+        alert('Error: ' + (result.message || 'Unknown error occurred'));
+      }
+    } catch (error) {
+      console.error('Revoke device error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Revoke invite token
+  async function revokeInviteToken(tokenId) {
+    if (!confirm('Are you sure you want to revoke this invite token?')) return;
+
+    try {
+      const response = await fetch('/admin/revoke_invite_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ token_id: tokenId })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        window.location.reload();
+      } else {
+        alert('Error: ' + (result.message || 'Unknown error occurred'));
+      }
+    } catch (error) {
+      console.error('Revoke invite token error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Invite token modal
+  let currentInviteUserId = null;
+  let currentInviteUserEmail = null;
+
+  function openInviteTokenModal(userId, email) {
+    currentInviteUserId = userId;
+    currentInviteUserEmail = email;
+    document.getElementById('inviteTokenModalTitle').textContent = `Generate Invite Token for ${email}`;
+    document.getElementById('inviteTokenModal').classList.remove('hidden');
+    document.getElementById('inviteTokenResult').classList.add('hidden');
+    document.getElementById('inviteTokenForm').classList.remove('hidden');
+  }
+
+  function closeInviteTokenModal() {
+    document.getElementById('inviteTokenModal').classList.add('hidden');
+    currentInviteUserId = null;
+    currentInviteUserEmail = null;
+  }
+
+  async function generateInviteToken() {
+    const expiresIn = document.getElementById('inviteTokenExpiry').value;
+
+    try {
+      const response = await fetch('/admin/create_invite_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ user_id: currentInviteUserId, expires_in: expiresIn })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        // Show the token and invite link
+        document.getElementById('inviteTokenForm').classList.add('hidden');
+        document.getElementById('inviteTokenResult').classList.remove('hidden');
+        document.getElementById('generatedInviteLink').textContent = result.invite_link;
+        document.getElementById('generatedToken').textContent = result.token;
+        document.getElementById('tokenExpiryInfo').textContent = result.expires_at
+          ? `Expires: ${new Date(result.expires_at).toLocaleDateString()}`
+          : 'Never expires';
+      } else {
+        alert('Error: ' + (result.message || 'Unknown error occurred'));
+      }
+    } catch (error) {
+      console.error('Generate invite token error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  function copyInviteLink() {
+    const link = document.getElementById('generatedInviteLink').textContent;
+    navigator.clipboard.writeText(link).then(() => {
+      const btn = document.getElementById('copyLinkBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000);
+    });
+  }
+
+  function copyInviteToken() {
+    const token = document.getElementById('generatedToken').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+      const btn = document.getElementById('copyTokenBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
+  }
+
+  function toggleTokenDetails() {
+    const detailsEl = document.getElementById('tokenDetailsSection');
+    const caretEl = document.getElementById('tokenDetailsCaret');
+
+    if (detailsEl.style.maxHeight && detailsEl.style.maxHeight !== '0px') {
+      detailsEl.style.maxHeight = '0px';
+      caretEl.style.transform = 'rotate(0deg)';
+    } else {
+      detailsEl.style.maxHeight = detailsEl.scrollHeight + 'px';
+      caretEl.style.transform = 'rotate(90deg)';
+    }
+  }
+
+  // Close modal on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeInviteTokenModal();
+    }
+  });
+</script>
+
+<!-- Invite Token Modal -->
+<div id="inviteTokenModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/50" onclick="closeInviteTokenModal()"></div>
+
+  <!-- Modal content -->
+  <div class="relative bg-primary rounded-xl shadow-lg p-6 w-full max-w-md mx-4" style="background-color: var(--color-bg-primary);">
+    <div class="flex items-center justify-between mb-4">
+      <h3 id="inviteTokenModalTitle" class="text-title-sm">Generate Invite Token</h3>
+      <button onclick="closeInviteTokenModal()" class="text-muted hover:text-primary">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Form section -->
+    <div id="inviteTokenForm">
+      <div class="mb-4">
+        <label class="text-body-sm text-muted block mb-2">Expiration</label>
+        <select id="inviteTokenExpiry" class="input-field w-full">
+          <option value="7">7 days</option>
+          <option value="15">15 days</option>
+          <option value="30">30 days</option>
+          <option value="never">Never expires</option>
+        </select>
+      </div>
+
+      <button onclick="generateInviteToken()" class="btn-primary w-full">
+        Generate Token
+      </button>
+    </div>
+
+    <!-- Result section -->
+    <div id="inviteTokenResult" class="hidden">
+      <!-- Invite Link (Primary) -->
+      <div class="mb-4">
+        <label class="text-body-sm text-muted block mb-2">Invite Link (tap to sign in)</label>
+        <div class="flex items-center gap-2">
+          <code id="generatedInviteLink" class="flex-1 text-accent font-mono text-xs break-all p-3 rounded-lg" style="background-color: var(--color-bg-tertiary);"></code>
+          <button id="copyLinkBtn" onclick="copyInviteLink()" class="btn-primary whitespace-nowrap">Copy Link</button>
+        </div>
+        <p id="tokenExpiryInfo" class="text-body-sm text-muted mt-2"></p>
+      </div>
+
+      <p class="text-body-sm text-muted mb-4">
+        Text or share this link with the user. They can tap it to sign in directly.
+      </p>
+
+      <!-- Raw Token (Collapsible) -->
+      <div class="mb-4">
+        <button
+          class="flex items-center gap-1 text-body-sm text-muted hover:text-primary transition-colors"
+          onclick="toggleTokenDetails()"
+        >
+          <svg
+            id="tokenDetailsCaret"
+            class="w-3 h-3"
+            style="transition: transform 0.2s ease-out;"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+          <span>Manual entry details</span>
+        </button>
+        <div
+          id="tokenDetailsSection"
+          style="max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out;"
+        >
+          <div class="mt-2 p-3 rounded-lg" style="background-color: var(--color-bg-tertiary);">
+            <p class="text-body-xs text-muted mb-2">If the link doesn't work, use these details in the app:</p>
+            <div class="flex items-center gap-2">
+              <code id="generatedToken" class="flex-1 text-accent font-mono text-sm break-all"></code>
+              <button id="copyTokenBtn" onclick="copyInviteToken()" class="btn-secondary text-body-xs whitespace-nowrap">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="closeInviteTokenModal(); window.location.reload();" class="btn-primary w-full">
+        Done
+      </button>
+    </div>
+  </div>
+</div>

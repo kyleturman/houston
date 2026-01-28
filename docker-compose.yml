@@ -1,0 +1,173 @@
+name: houston
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-houston_development}
+      POSTGRES_USER: ${POSTGRES_USER:-houston}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development_password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-houston} -d ${POSTGRES_DB:-houston_development}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and background jobs
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./scripts/health:/scripts/health:ro
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    # Use custom config to prevent write blocking on bgsave errors
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    healthcheck:
+      # Verify Redis can read AND write (catches MISCONF errors)
+      test: ["CMD-SHELL", "/scripts/health/check-redis.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Rails API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    environment:
+      RAILS_MAX_THREADS: "16"
+      REDIS_URL: "redis://redis:6379/0"
+      # Health monitor config - exit after 3 consecutive failures
+      HEALTH_CHECK_INTERVAL: "30"
+      HEALTH_CHECK_RETRIES: "3"
+      HEALTH_CHECK_START_DELAY: "60"
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env
+      - ./mcp:/app/mcp
+      - /var/run/docker.sock:/var/run/docker.sock
+      - rails_bundle:/usr/local/bundle
+      - ./data/uploads:/app/storage
+      - ./scripts/health:/scripts/health:ro
+    ports:
+      - "${PORT:-3033}:${PORT:-3033}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    # Uses health-monitored wrapper for auto-recovery (see scripts/health/README.md)
+    command: >
+      bash -c "
+        bundle install &&
+        bundle exec rails db:prepare &&
+        rm -f tmp/pids/server.pid &&
+        /scripts/health/run-with-healthcheck.sh /scripts/health/check-backend.sh bundle exec rails server -b 0.0.0.0 -p ${PORT:-3033}
+      "
+    healthcheck:
+      # Test: Make actual HTTP request with 3s timeout
+      # If server is hung (like the deadlock scenario), this will fail and trigger restart
+      test: ["CMD-SHELL", "timeout 3 curl -f http://localhost:${PORT:-3033}/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # Sidekiq Background Job Processor
+  # Uses health-monitored wrapper for auto-recovery (see scripts/health/README.md)
+  sidekiq:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    environment:
+      # Health monitor config - exit after 3 consecutive failures
+      HEALTH_CHECK_INTERVAL: "30"
+      HEALTH_CHECK_RETRIES: "3"
+      HEALTH_CHECK_START_DELAY: "45"
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env
+      - ./mcp:/app/mcp
+      - /var/run/docker.sock:/var/run/docker.sock
+      - rails_bundle:/usr/local/bundle
+      - ./data/uploads:/app/storage
+      - ./scripts/health:/scripts/health:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Wrapper monitors health and exits on consecutive failures, triggering restart
+    command: >
+      bash -c "
+        bundle install &&
+        /scripts/health/run-with-healthcheck.sh /scripts/health/check-sidekiq.sh bundle exec sidekiq
+      "
+    healthcheck:
+      # Verify Sidekiq can write to Redis (catches MISCONF and connection issues)
+      test: ["CMD-SHELL", "/scripts/health/check-sidekiq.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # Nginx Reverse Proxy (Optional for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./config/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # ngrok Tunnel (auto-enabled when NGROK_DOMAIN is set)
+  # Provides public HTTPS URL for iOS app to reach your local server
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: http backend:${PORT:-3033} --domain=${NGROK_DOMAIN:-localhost}
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles:
+      - tunnel
+
+volumes:
+  postgres_data:
+    name: houston_postgres_data
+    external: true
+  redis_data:
+    name: houston_redis_data
+    external: true
+  rails_bundle:
+    name: houston_rails_bundle
+    external: true
+
+networks:
+  default:
+    name: houston_default

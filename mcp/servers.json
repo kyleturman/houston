@@ -1,0 +1,67 @@
+{
+  "servers": {
+    "brave-search": {
+      "name": "Brave Search",
+      "description": "Web search using Brave's privacy-focused search engine",
+      "transport": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "BRAVE_API_KEY",
+        "mcp/brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "authProvider": "auth-providers/none.json",
+      "connectionStrategy": "single"
+    },
+    "plaid": {
+      "name": "Plaid Banking",
+      "description": "Connect bank accounts and credit cards to analyze spending",
+      "transport": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/plaid"
+      ],
+      "authProvider": "auth-providers/plaid.json",
+      "connectionStrategy": "multiple"
+    },
+    "google-calendar": {
+      "name": "Google Calendar",
+      "description": "Manage calendar events with multi-account support",
+      "transport": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/calendar"],
+      "authProvider": "auth-providers/google-oauth.json",
+      "authScope": "calendar",
+      "connectionStrategy": "multiple"
+    },
+    "gmail": {
+      "name": "Gmail",
+      "description": "Read, search, and send Gmail with multi-account support",
+      "transport": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/gmail"],
+      "authProvider": "auth-providers/google-oauth.json",
+      "authScope": "gmail",
+      "connectionStrategy": "multiple"
+    },
+    "todoist": {
+      "name": "Todoist",
+      "description": "Personal task management and to-do lists",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-todoist"],
+      "authProvider": "auth-providers/todoist-oauth.json",
+      "authScope": "default",
+      "connectionStrategy": "single"
+    }
+  }
+}

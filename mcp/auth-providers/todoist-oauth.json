@@ -1,0 +1,54 @@
+{
+  "type": "oauth2",
+  "displayName": "Todoist Account",
+  "description": "Sign in with your Todoist account",
+
+  "backend": {
+    "authorizeEndpoint": {
+      "url": "https://todoist.com/oauth/authorize",
+      "params": {
+        "client_id": "{{client_id}}",
+        "redirect_uri": "{{redirect_uri}}",
+        "scope": "{{scope}}",
+        "state": "{{state}}"
+      }
+    },
+    "tokenEndpoint": {
+      "url": "https://todoist.com/oauth/access_token",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "body": {
+        "client_id": "{{client_id}}",
+        "client_secret": "{{client_secret}}",
+        "code": "{{code}}",
+        "redirect_uri": "{{redirect_uri}}"
+      },
+      "response": {
+        "accessToken": "access_token"
+      }
+    },
+    "credentialsEnv": [
+      "TODOIST_CLIENT_ID",
+      "TODOIST_CLIENT_SECRET"
+    ],
+    "configured": "all_present"
+  },
+
+  "scopes": {
+    "default": "data:read_write,data:delete"
+  },
+
+  "runtime": {
+    "envMapping": {
+      "accessToken": "TODOIST_ACCESS_TOKEN"
+    }
+  },
+
+  "ios": {
+    "handler": "oauth2",
+    "pkceEnabled": false,
+    "redirectUri": "life-assistant://oauth-callback"
+  }
+}

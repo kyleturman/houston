@@ -1,0 +1,34 @@
+.DS_Store
+.env
+backend/tmp
+backend/tmp/*
+backend/log
+backend/log/*
+
+# Rails credentials (users generate their own)
+backend/config/master.key
+backend/config/credentials.yml.enc
+
+# Xcode project: keep the .xcodeproj and shared schemes, ignore user data
+ios/Houston.xcodeproj/xcuserdata/
+ios/Houston.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Common Xcode noise
+*.xcuserdatad
+*.xcscmblueprint
+
+# Derived data (build artifacts outside repo)
+~/Library/Developer/Xcode/DerivedData/
+
+# iOS build artifacts from our build validation system
+ios/build/
+
+# Fastlane secrets and artifacts
+ios/fastlane/.env
+ios/fastlane/AuthKey*.p8
+ios/fastlane/report.xml
+ios/fastlane/README.md
+ios/Gemfile.lock
+
+# MCP server dependencies
+node_modules/

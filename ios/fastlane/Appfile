@@ -1,0 +1,11 @@
+# App identifiers
+app_identifier("com.heyhouston.app")
+
+# Apple Developer Portal / App Store Connect
+# Get your Team ID from: https://developer.apple.com/account → Membership Details
+# Or in App Store Connect: Users and Access → Team ID
+team_id(ENV["APPLE_TEAM_ID"])
+
+# App Store Connect API Key (recommended for CI/automation)
+# Generate at: App Store Connect → Users and Access → Integrations → App Store Connect API
+# This avoids 2FA prompts during automated builds

@@ -1,0 +1,23 @@
+{
+  "type": "api_key",
+  "displayName": "API Key Authentication",
+  "description": "Enter your API key to authenticate",
+
+  "runtime": {
+    "envMapping": {
+      "apiKey": "API_KEY"
+    }
+  },
+
+  "ios": {
+    "handler": "api_key_input",
+    "fields": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "placeholder": "Enter your API key",
+        "secure": true
+      }
+    ]
+  }
+}

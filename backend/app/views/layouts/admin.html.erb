@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Houston Admin</title>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Admin Design System (overrides Tailwind) -->
+  <style>
+    <%= File.read(Rails.root.join('app/assets/stylesheets/admin_design_system.css')).html_safe %>
+  </style>
+
+  <%= yield :head %>
+</head>
+<body class="bg-primary min-h-screen">
+  <%= render 'shared/admin_header' %>
+
+  <% if defined?(flash) && flash[:success] %>
+    <div class="fixed top-4 right-4 z-50 alert-success z-10 max-w-sm">
+      <%= flash[:success] %>
+    </div>
+  <% end %>
+
+  <% if defined?(flash) && flash[:error] %>
+    <div class="fixed top-4 right-4 z-50 alert-error z-10 max-w-sm">
+      <%= flash[:error] %>
+    </div>
+  <% end %>
+
+  <%= yield %>
+</body>
+</html>

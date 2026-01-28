@@ -1,0 +1,119 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+RSpec.describe Tools::Registry do
+  let(:user) { create(:user) }
+  let(:goal) { create(:goal, user: user) }
+  let(:task) { create(:agent_task, goal: goal, user: user) }
+  let(:mcp_manager) { double('McpManager') }
+  
+  describe '#initialize' do
+    it 'creates registry with required dependencies' do
+      registry = Tools::Registry.new(
+        user: user,
+        goal: goal,
+        task: task,
+        agentable: goal,
+        mcp_manager: mcp_manager
+      )
+      
+      expect(registry).to be_a(Tools::Registry)
+    end
+  end
+  
+  describe '#provider_tools' do
+    let(:registry) do
+      Tools::Registry.new(
+        user: user,
+        goal: goal,
+        task: task,
+        agentable: goal,
+        mcp_manager: mcp_manager
+      )
+    end
+    
+    before do
+      allow(mcp_manager).to receive(:list_tools).and_return([])
+    end
+    
+    it 'returns system tools for goal context' do
+      tools = registry.provider_tools(context: :goal)
+      
+      expect(tools).to be_an(Array)
+      expect(tools).not_to be_empty
+      
+      tool_names = tools.map { |tool| tool[:name] }
+      expect(tool_names).to include('create_note', 'send_message', 'create_task')
+    end
+    
+    it 'returns system tools for task context' do
+      tools = registry.provider_tools(context: :task)
+      
+      expect(tools).to be_an(Array)
+      expect(tools).not_to be_empty
+      
+      tool_names = tools.map { |tool| tool[:name] }
+      expect(tool_names).to include('create_note', 'send_message')
+      expect(tool_names).not_to include('create_task') # Only for goals
+    end
+    
+    it 'includes MCP tools when available' do
+      mcp_tools = [
+        {
+          name: 'mcp_search',
+          description: 'Search using MCP',
+          input_schema: { type: 'object', properties: { query: { type: 'string' } } }
+        }
+      ]
+      allow(mcp_manager).to receive(:list_tools).and_return(mcp_tools)
+      
+      tools = registry.provider_tools(context: :goal)
+      tool_names = tools.map { |tool| tool[:name] }
+      
+      expect(tool_names).to include('mcp_search')
+    end
+    
+    it 'handles MCP manager errors gracefully' do
+      allow(mcp_manager).to receive(:list_tools).and_raise(StandardError, 'MCP error')
+      
+      expect {
+        tools = registry.provider_tools(context: :goal)
+        expect(tools).to be_an(Array) # Should still return system tools
+      }.not_to raise_error
+    end
+  end
+  
+  describe '#execute_tool' do
+    let(:registry) do
+      Tools::Registry.new(
+        user: user,
+        goal: goal,
+        task: task,
+        agentable: goal,
+        mcp_manager: mcp_manager
+      )
+    end
+    
+    it 'executes system tools' do
+      result = registry.execute_tool(
+        tool_name: 'send_message',
+        parameters: { content: 'Test message' }
+      )
+      
+      expect(result).to be_a(Hash)
+      expect(result[:success]).to be_truthy
+    end
+    
+    it 'handles invalid tool names' do
+      result = registry.execute_tool(
+        tool_name: 'invalid_tool',
+        parameters: {}
+      )
+      
+      expect(result).to be_a(Hash)
+      expect(result[:success]).to be_falsy
+      expect(result[:error]).to be_present
+    end
+  end
+end

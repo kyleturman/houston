@@ -1,0 +1,8 @@
+# Fastlane dependencies
+source "https://rubygems.org"
+
+gem "fastlane", "~> 2.225"
+gem "jwt", "~> 2.7"  # For App Store Connect API authentication
+
+# Optional plugins
+# gem "fastlane-plugin-firebase_app_distribution"

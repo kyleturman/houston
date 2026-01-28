@@ -1,0 +1,42 @@
+# Houston - Fastlane Configuration
+# Primary deployment via: make ios-beta (uses ios/scripts/testflight.sh)
+# This file provides additional utility lanes
+
+default_platform(:ios)
+
+require 'fileutils'
+
+platform :ios do
+  desc "Build IPA only (no upload)"
+  lane :build do
+    build_app(
+      scheme: "Houston",
+      export_method: "app-store",
+      output_directory: "build",
+      output_name: "Houston.ipa",
+      clean: true,
+      xcargs: "-allowProvisioningUpdates"
+    )
+  end
+
+  desc "Build for development/testing"
+  lane :build_dev do
+    build_app(
+      scheme: "Houston",
+      export_method: "development",
+      output_directory: "build",
+      output_name: "Houston-dev.ipa",
+      clean: true,
+      xcargs: "-allowProvisioningUpdates"
+    )
+  end
+
+  desc "Run tests"
+  lane :test do
+    run_tests(
+      scheme: "Houston",
+      devices: ["iPhone 15"],
+      clean: true
+    )
+  end
+end

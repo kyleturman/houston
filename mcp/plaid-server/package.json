@@ -1,0 +1,33 @@
+{
+  "name": "plaid-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Plaid financial data integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "plaid",
+    "financial",
+    "banking",
+    "transactions"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "plaid": "^18.1.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0"
+  }
+}

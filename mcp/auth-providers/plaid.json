@@ -1,0 +1,69 @@
+{
+  "type": "plaid_link",
+  "displayName": "Plaid Banking",
+  "description": "Connect your bank accounts and credit cards to analyze spending, track balances, and manage your finances",
+
+  "backend": {
+    "linkTokenEndpoint": {
+      "url": "https://{{env}}.plaid.com/link/token/create",
+      "method": "POST",
+      "headers": {
+        "PLAID-CLIENT-ID": "{{PLAID_CLIENT_ID}}",
+        "PLAID-SECRET": "{{PLAID_SECRET}}",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "user": {
+          "client_user_id": "{{user_id}}"
+        },
+        "client_name": "Houston",
+        "products": ["transactions"],
+        "country_codes": ["US"],
+        "language": "en",
+        "redirect_uri": "{{redirect_uri}}"
+      },
+      "response": {
+        "linkToken": "link_token",
+        "expiration": "expiration"
+      }
+    },
+    "exchangeTokenEndpoint": {
+      "url": "https://{{env}}.plaid.com/item/public_token/exchange",
+      "method": "POST",
+      "headers": {
+        "PLAID-CLIENT-ID": "{{PLAID_CLIENT_ID}}",
+        "PLAID-SECRET": "{{PLAID_SECRET}}",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "public_token": "{{public_token}}"
+      },
+      "response": {
+        "accessToken": "access_token",
+        "itemId": "item_id"
+      }
+    },
+    "credentialsEnv": [
+      "PLAID_CLIENT_ID",
+      "PLAID_SECRET",
+      "PLAID_ENV"
+    ]
+  },
+
+  "runtime": {
+    "envMapping": {
+      "accessToken": "PLAID_ACCESS_TOKEN",
+      "itemId": "PLAID_ITEM_ID"
+    },
+    "connectionLabel": "{{institution_name}} - {{accounts_count}} account(s)"
+  },
+
+  "ios": {
+    "handler": "plaid_link",
+    "sdk": {
+      "package": "https://github.com/plaid/plaid-link-ios-spm.git",
+      "version": "5.0.0"
+    },
+    "redirectUri": "heyhouston://plaid-oauth"
+  }
+}

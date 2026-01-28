@@ -1,0 +1,10 @@
+Sign in to <%= @server_name %>
+
+Hi <%= @user.email %>,
+
+Welcome to <%= @server_name %>.
+
+Click the link below to sign in to the iOS app:
+<%= @server_url %>/auth/signin?token=<%= CGI.escape(@token) %>
+
+This link expires in 15 minutes. If it expires, clicking the link again will send you a fresh one.

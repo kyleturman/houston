@@ -1,0 +1,41 @@
+# TestFlight Deployment Configuration
+# All non-secret settings for automated TestFlight builds
+
+# App identifiers
+app_id: "6758280743"
+bundle_id: "com.heyhouston.app"
+
+# Beta tester group (created automatically if missing)
+external_group: "External"
+
+# Review contact info
+contact:
+  email: "kyle@kyleis.com"
+  first_name: "Kyle"
+  last_name: "Turman"
+  phone: "+14056065609"
+
+# Demo account email (used for Apple review)
+demo_email: "demo@apple-review.local"
+
+# Beta app description (shown in TestFlight app to testers)
+beta_description: |
+  Houston is a self-hosted AI assistant that helps you achieve your goals.
+  This beta version may contain bugs. Please report issues via the feedback button.
+
+# Review notes template
+# Placeholders: {{invite_link}}, {{server_url}}
+review_notes_template: |
+  Houston is a self-hosted AI assistant app.
+
+  TO SIGN IN:
+  1. Open the Houston app
+  2. Tap the rainbow-colored "use server invite code" text
+  3. In the "Paste invite link" field, paste this link:
+
+  {{invite_link}}
+
+  4. Tap "Sign In"
+
+  The invite code is valid for 24 hours after first use.
+  Server: {{server_url}}

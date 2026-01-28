@@ -1,0 +1,21 @@
+<% signin_url = "#{@server_url}/auth/signin?token=#{CGI.escape(@token)}" %>
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #333;">
+  <p>
+    Welcome to Houston on <strong><%= @server_name %></strong>.
+  </p>
+  <p>
+    Click the button below to sign in to the admin dashboard:
+  </p>
+  <p>
+    <a href="<%= signin_url %>" style="display:inline-block;padding:12px 24px;background:#000000;color:#fff;text-decoration:none;border-radius:8px;">Sign into Dashboard</a>
+  </p>
+  <p style="font-size: 13px; color: #777;">
+    This link expires in 15 minutes. If it expires, clicking the link again will send you a fresh one.
+  </p>
+  <hr style="border:none;border-top:1px solid #eee;margin:20px 0;" />
+  <p style="font-size: 12px; color: #777;">
+    If the button doesn't work, you can copy this URL:
+    <br />
+    <code><%= signin_url %></code>
+  </p>
+</div>

@@ -1,0 +1,68 @@
+<div class="max-w-sm mx-auto">
+  <% if EmailConfig.enabled? %>
+    <!-- Email sign-in (magic link) -->
+    <%= form_with url: admin_signin_path, method: :post, local: true, class: "flex flex-col gap-4" do |f| %>
+      <div>
+        <input
+          type="email"
+          name="email"
+          id="email"
+          required
+          autofocus
+          class="input-field"
+          placeholder="admin@example.com"
+        >
+      </div>
+
+      <button type="submit" class="btn-primary">
+        Send Login Link
+      </button>
+    <% end %>
+
+    <div class="flex items-center gap-3 my-6">
+      <div class="flex-1 border-t border-subtle"></div>
+      <span class="text-body-sm text-muted">or</span>
+      <div class="flex-1 border-t border-subtle"></div>
+    </div>
+  <% end %>
+
+  <!-- Invite code sign-in -->
+  <%= form_with url: admin_signin_path, method: :post, local: true, class: "flex flex-col gap-4" do |f| %>
+    <%= hidden_field_tag :auth_method, 'invite_code' %>
+
+    <div>
+      <label for="invite_email" class="text-body-sm text-muted block mb-1">Email</label>
+      <input
+        type="email"
+        name="email"
+        id="invite_email"
+        required
+        <%= 'autofocus' unless EmailConfig.enabled? %>
+        class="input-field"
+        placeholder="admin@example.com"
+      >
+    </div>
+
+    <div>
+      <label for="invite_code" class="text-body-sm text-muted block mb-1">Invite Code</label>
+      <input
+        type="text"
+        name="invite_code"
+        id="invite_code"
+        required
+        class="input-field font-mono"
+        placeholder="abc123..."
+        autocomplete="off"
+        autocapitalize="off"
+      >
+    </div>
+
+    <button type="submit" class="btn-primary">
+      Sign In with Code
+    </button>
+
+    <p class="text-body-xs text-muted text-center mt-2">
+      Generate a code with: <code class="bg-secondary px-1.5 py-0.5 rounded">make invite-code EMAIL=...</code>
+    </p>
+  <% end %>
+</div>
